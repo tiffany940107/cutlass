@@ -169,6 +169,7 @@ foreach(EXAMPLE
   89_sm103_fp4_ultra_gemm
   90_sm103_fp4_ultra_grouped_gemm
   91_fp4_gemv
+  120_hopper_fmha_sm120
   )
 
   add_subdirectory(${EXAMPLE})
