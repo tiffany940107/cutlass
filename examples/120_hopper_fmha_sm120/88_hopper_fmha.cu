@@ -238,7 +238,7 @@ struct FwdRunner {
   using Element = cutlass::float_e4m3_t;
   using ElementAccumulatorQK = find_option_t<Tag::kAccQK, float, KernelOptions...>;
 #else
-  using Element = cutlass::half_t;
+  using Element = cutlass::float_e2m1_t;  // Use E2M1 like Sage3 for NVFP4 compatibility
   using ElementAccumulatorQK = float;
 #endif
 
@@ -568,7 +568,7 @@ template<
 >
 struct BwdRunner {
 
-  using Element = cutlass::half_t;
+  using Element = cutlass::float_e2m1_t;  // Use E2M1 like Sage3 for NVFP4 compatibility
   using ElementAccumulator = float;
 
   // B H Q K D

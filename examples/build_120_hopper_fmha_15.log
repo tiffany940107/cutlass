@@ -1,0 +1,160 @@
+Building CUDA object examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/88_hopper_fmha.cu.o
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(168): error: overloaded function "select" is not a type name
+        Tile<select<0>(TileShapeQK{}), select<1>(TileShapeQK{}), select<2>(TileShapeQK{})>{}
+             ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(168): error: expected a ")"
+        Tile<select<0>(TileShapeQK{}), select<1>(TileShapeQK{}), select<2>(TileShapeQK{})>{}
+                                  ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(168): error: expected a ">"
+        Tile<select<0>(TileShapeQK{}), select<1>(TileShapeQK{}), select<2>(TileShapeQK{})>{}
+                                  ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(168): error: expected an expression
+        Tile<select<0>(TileShapeQK{}), select<1>(TileShapeQK{}), select<2>(TileShapeQK{})>{}
+                                                                                          ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(169): error: expected a ";"
+    ));
+     ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(174): error: overloaded function "select" is not a type name
+        Tile<select<0>(TileShapePV{}), select<1>(TileShapePV{}), select<2>(TileShapePV{})>{}
+             ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(174): error: expected a ")"
+        Tile<select<0>(TileShapePV{}), select<1>(TileShapePV{}), select<2>(TileShapePV{})>{}
+                                  ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(174): error: expected a ">"
+        Tile<select<0>(TileShapePV{}), select<1>(TileShapePV{}), select<2>(TileShapePV{})>{}
+                                  ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(174): error: expected an expression
+        Tile<select<0>(TileShapePV{}), select<1>(TileShapePV{}), select<2>(TileShapePV{})>{}
+                                                                                          ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(175): error: expected a ";"
+    ));
+     ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(331): error: a class or namespace qualified name is required
+    static_assert(size(typename CollectiveMmaQK::TiledMma{}) == size(typename CollectiveMmaPV::TiledMma{}));
+                                ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(331): error: type name is not allowed
+    static_assert(size(typename CollectiveMmaQK::TiledMma{}) == size(typename CollectiveMmaPV::TiledMma{}));
+                       ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(331): error: expected a ")"
+    static_assert(size(typename CollectiveMmaQK::TiledMma{}) == size(typename CollectiveMmaPV::TiledMma{}));
+                                               ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(331): error: a class or namespace qualified name is required
+    static_assert(size(typename CollectiveMmaQK::TiledMma{}) == size(typename CollectiveMmaPV::TiledMma{}));
+                                                                              ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(331): error: type name is not allowed
+    static_assert(size(typename CollectiveMmaQK::TiledMma{}) == size(typename CollectiveMmaPV::TiledMma{}));
+                                                                     ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(331): error: expected a ")"
+    static_assert(size(typename CollectiveMmaQK::TiledMma{}) == size(typename CollectiveMmaPV::TiledMma{}));
+                                                                                             ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(333): error: a class or namespace qualified name is required
+    static const int MaxThreadsPerBlock = size(typename CollectiveMmaQK::TiledMma{});
+                                                        ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(333): error: type name is not allowed
+    static const int MaxThreadsPerBlock = size(typename CollectiveMmaQK::TiledMma{});
+                                               ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(333): error: expected a ")"
+    static const int MaxThreadsPerBlock = size(typename CollectiveMmaQK::TiledMma{});
+                                                                       ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(348): error: name followed by "::" must be a class or namespace name
+      auto params_qk = CollectiveMmaQK::to_underlying_arguments(problem_shape_qk,
+                       ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(349): error: a class or namespace qualified name is required
+          typename CollectiveMmaQK::Arguments {
+                   ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(349): error: type name is not allowed
+          typename CollectiveMmaQK::Arguments {
+          ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(349): error: expected a ")"
+          typename CollectiveMmaQK::Arguments {
+                                  ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(354): warning #12-D: parsing restarts here after previous syntax error
+          }, nullptr);
+           ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(354): error: expected an identifier
+          }, nullptr);
+             ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(348): error: cannot deduce "auto" type (initializer required)
+      auto params_qk = CollectiveMmaQK::to_underlying_arguments(problem_shape_qk,
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(357): error: name followed by "::" must be a class or namespace name
+      auto params_pv = CollectiveMmaPV::to_underlying_arguments(problem_shape_pv,
+                       ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(358): error: a class or namespace qualified name is required
+          typename CollectiveMmaPV::Arguments {
+                   ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(358): error: type name is not allowed
+          typename CollectiveMmaPV::Arguments {
+          ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(358): error: expected a ")"
+          typename CollectiveMmaPV::Arguments {
+                                  ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(363): warning #12-D: parsing restarts here after previous syntax error
+          }, nullptr);
+           ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(363): error: expected an identifier
+          }, nullptr);
+             ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(357): error: cannot deduce "auto" type (initializer required)
+      auto params_pv = CollectiveMmaPV::to_underlying_arguments(problem_shape_pv,
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(427): error: a class or namespace qualified name is required
+        if constexpr (cute::is_same_v<typename CollectiveMmaQK::GmemTiledCopyB, SM90_TMA_LOAD_MULTICAST>) {
+                                               ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(427): error: too few arguments for variable template "std::is_same_v"
+        if constexpr (cute::is_same_v<typename CollectiveMmaQK::GmemTiledCopyB, SM90_TMA_LOAD_MULTICAST>) {
+                                                              ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(427): error: global-scope qualifier (leading "::") is not allowed
+        if constexpr (cute::is_same_v<typename CollectiveMmaQK::GmemTiledCopyB, SM90_TMA_LOAD_MULTICAST>) {
+                                                              ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(427): error: a condition declaration can only declare one variable
+        if constexpr (cute::is_same_v<typename CollectiveMmaQK::GmemTiledCopyB, SM90_TMA_LOAD_MULTICAST>) {
+                                                                                ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(427): error: expected a ")"
+        if constexpr (cute::is_same_v<typename CollectiveMmaQK::GmemTiledCopyB, SM90_TMA_LOAD_MULTICAST>) {
+                                                                                                       ^
+
+36 errors detected in the compilation of "/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu".
+make[3]: *** [examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/build.make:80: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/88_hopper_fmha.cu.o] Error 2
+make[2]: *** [CMakeFiles/Makefile2:51605: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/all] Error 2
+make[1]: *** [CMakeFiles/Makefile2:51612: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/rule] Error 2
+make: *** [Makefile:17178: 120_hopper_fmha_sm120] Error 2

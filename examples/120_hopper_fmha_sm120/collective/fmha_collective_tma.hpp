@@ -38,6 +38,7 @@
 #include "../collective/fmha_collective_load.hpp"
 #include "../collective/fmha_collective_softmax.hpp"
 #include "../kernel/fmha_options.hpp"
+#include "../cute_extension.h"
 
 namespace cutlass::fmha::collective {
 
@@ -83,37 +84,112 @@ struct FmhaMainloopTma {
   using ElementNVFP4 = cutlass::nv_float4_t<cutlass::float_e2m1_t>;
   using ElementScaleFactor = typename ElementNVFP4::ScaleFactorType;
   
-  using CollectiveMmaQK = typename cutlass::gemm::collective::CollectiveBuilder<
-      cutlass::arch::Sm120, cutlass::arch::OpClassBlockScaledTensorOp,
-      ElementNVFP4, LayoutQ, Alignment,
-      ElementNVFP4, LayoutK, Alignment,
-      ElementAccumulator,
-      TileShapeQK, ClusterShape,
-      cutlass::gemm::collective::StageCountAutoCarveout<static_cast<int>(sizeof(SharedStorage))>,
-      cutlass::gemm::collective::KernelScheduleAuto>::CollectiveOp;
+  // BlockScaledConfig for NVFP4 scale factors (based on Sage3 design)
+  template<int SFVecSize_>
+  struct BlockScaledConfig {
+    static constexpr int SFVecSize = SFVecSize_;
+    static constexpr int MMA_NSF = 4; // SFVecSize, MMA_NSF
+    using Blk_MN = _64;
+    using Blk_SF = _4; 
+    using mnBasicBlockShape = Shape<_16,_4>;
+    using mnBasicBlockStride = Stride<_16,_4>;
+    using kBasicBlockShape = Shape<Int<SFVecSize>, Int<MMA_NSF>>;
+    using kBasicBlockStride = Stride<_0, _1>;
+    using SfAtom = Layout<Shape<mnBasicBlockShape, kBasicBlockShape>, 
+                          Stride<mnBasicBlockStride, kBasicBlockStride>>;
 
-  using CollectiveMmaPV = typename cutlass::gemm::collective::CollectiveBuilder<
-      cutlass::arch::Sm120, cutlass::arch::OpClassBlockScaledTensorOp,
-      // the stride for A does not matter since we do not load from smem at all
-      ElementNVFP4, LayoutK, Alignment,
-      ElementNVFP4, decltype(select<1,0,2>(LayoutV{})), Alignment,
-      ElementAccumulator,
-      TileShapePV, ClusterShape,
-      cutlass::gemm::collective::StageCountAutoCarveout<static_cast<int>(sizeof(SharedStorage))>,
-      cutlass::gemm::collective::KernelScheduleAuto>::CollectiveOp;
+    using LayoutSF = decltype(blocked_product(SfAtom{}, 
+                                  make_layout(
+                                      make_shape(int32_t(0), int32_t(0), int32_t(0), int32_t(0)),
+                                      make_stride(int32_t(0), _1{}, int32_t(0), int32_t(0)))));
+    
+    using Blk_Elems = decltype(Blk_MN{} * Blk_SF{});
+    using sSF_strideMN = decltype(prepend(Blk_Elems{}, mnBasicBlockStride{}));
+    
+    // Function to create scale factor layout for QKV
+    template <class ProblemShape>
+    CUTE_HOST_DEVICE
+    static constexpr auto
+    tile_atom_to_shape_SFQKV(ProblemShape problem_shape) {
+      auto [Seqlen, Dim, HeadNum, Batch] = problem_shape;
+      return tile_to_shape(SfAtom{}, make_shape(Seqlen, Dim, HeadNum, Batch), Step<_2,_1,_3,_4>{});
+    }
+    
+    // Function to create scale factor layout for Vt
+    template <class ProblemShape>
+    CUTE_HOST_DEVICE
+    static constexpr auto
+    tile_atom_to_shape_SFVt(ProblemShape problem_shape) {
+      auto [Dim, Seqlen, HeadNum, Batch] = problem_shape;
+      return tile_to_shape(SfAtom{}, make_shape(Dim, Seqlen, HeadNum, Batch), Step<_2,_1,_3,_4>{});
+    }
+    
+    // Deduce shared memory layout for scale factors (based on Sage3)
+    template<class TiledMma, class TileShape_MNK>
+    CUTE_HOST_DEVICE
+    static constexpr auto
+    deduce_smem_layoutSFQ(TiledMma tiled_mma, TileShape_MNK tileshape_mnk) {
+      using sSFQ_shapeK = decltype(prepend(make_shape(Blk_SF{}/Int<MMA_NSF>{}, size<2>(TileShape_MNK{}) / Int<SFVecSize>{} / Blk_SF{}), kBasicBlockShape{}));
+      using sSFQ_shapeM = decltype(prepend(size<0>(TileShape_MNK{}) / Blk_MN{}, mnBasicBlockShape{}));
+      using sSFQ_strideM = sSF_strideMN;
+      using sSFQ_strideK = decltype(prepend(make_stride(Int<MMA_NSF>{}, size<0>(TileShape_MNK{}) / Blk_MN{} * Blk_Elems{}), kBasicBlockStride{}));
+      using sSFQ_shape = decltype(make_shape(sSFQ_shapeM{}, sSFQ_shapeK{}));
+      using sSFQ_stride = decltype(make_stride(sSFQ_strideM{}, sSFQ_strideK{}));
+      using SmemLayoutAtomSFQ = decltype(make_layout(sSFQ_shape{}, sSFQ_stride{}));
+      return SmemLayoutAtomSFQ{};
+    }
+    
+    template<class TiledMma, class TileShape_MNK>
+    CUTE_HOST_DEVICE
+    static constexpr auto
+    deduce_smem_layoutSFKV(TiledMma tiled_mma, TileShape_MNK tileshape_mnk) {
+      using sSFK_shapeK = decltype(prepend(make_shape(Blk_SF{}/Int<MMA_NSF>{}, size<2>(TileShape_MNK{}) / Int<SFVecSize>{} / Blk_SF{}), kBasicBlockShape{}));
+      using sSFK_shapeN = decltype(prepend(size<1>(TileShape_MNK{}) / Blk_MN{}, mnBasicBlockShape{}));
+      using sSFK_strideN = sSF_strideMN;
+      using sSFK_strideK = decltype(prepend(make_stride(Int<MMA_NSF>{}, size<1>(TileShape_MNK{}) / Blk_MN{} * Blk_Elems{}), kBasicBlockStride{}));
+      using sSFK_shape = decltype(make_shape(sSFK_shapeN{}, sSFK_shapeK{}));
+      using sSFK_stride = decltype(make_stride(sSFK_strideN{}, sSFK_strideK{}));
+      using SmemLayoutAtomSFK = decltype(make_layout(sSFK_shape{}, sSFK_stride{}));
+      return SmemLayoutAtomSFK{};
+    }
+  };
+  
+  // Direct TiledMma configuration (based on Sage3 approach)
+  static constexpr int SFVectorSize = 16;
+  using BlkScaledConfig = BlockScaledConfig<SFVectorSize>;
+  
+  // Define atom layouts for TiledMma
+  using AtomLayoutMNK = Layout<Shape<_4, _1, _1>>;
+  
+  // Create TiledMma directly (bypassing CollectiveBuilder)
+  using TiledMmaQK = decltype(cute::make_tiled_mma(
+      cute::SM120::BLOCKSCALED::SM120_16x32x64_TN_VS_NVFP4{},
+      AtomLayoutMNK{},
+      TileShapeQK{}
+  ));
+  
+  using TiledMmaPV = decltype(cute::make_tiled_mma(
+      cute::SM120::BLOCKSCALED::SM120_16x32x64_TN_VS_NVFP4{},
+      AtomLayoutMNK{},
+      TileShapePV{}
+  ));
 
-  using TiledMmaQK = typename CollectiveMmaQK::TiledMma;
-  using TiledMmaPV = decltype(convert_to_gmma_rs(typename CollectiveMmaPV::TiledMma{}));
+  // Scale factor layouts for NVFP4 GEMM operations (using our BlockScaledConfig)
+  using LayoutSF = typename BlkScaledConfig::LayoutSF;
+  using LayoutSFQ = LayoutSF;
+  using LayoutSFK = LayoutSF;
+  using LayoutSFV = LayoutSF;
 
-  // Scale factor layouts for NVFP4 GEMM operations
-  using Sm1xxBlkScaledConfig = typename CollectiveMmaQK::Sm1xxBlkScaledConfig;
-  using LayoutSFQ = typename CollectiveMmaQK::LayoutSFA;
-  using LayoutSFK = typename CollectiveMmaQK::LayoutSFB;
-  using LayoutSFV = typename CollectiveMmaPV::LayoutSFB;
-
-  using SmemLayoutQ = decltype(unstageSmemLayout(typename CollectiveMmaQK::SmemLayoutA{}, Int<StagesQ::value>{}));
-  using SmemLayoutK = typename CollectiveMmaQK::SmemLayoutB;
-  using SmemLayoutV = typename CollectiveMmaPV::SmemLayoutB;
+  // Shared memory layouts (based on Sage3 approach)
+  using SmemLayoutAtomQ = decltype(cutlass::gemm::collective::detail::sm120_rr_smem_selector<Element, decltype(size<2>(TileShapeQK{}))>());
+  using SmemLayoutAtomK = decltype(cutlass::gemm::collective::detail::sm120_rr_smem_selector<Element, decltype(size<2>(TileShapeQK{}))>());
+  using SmemLayoutAtomV = decltype(cutlass::gemm::collective::detail::sm120_rr_smem_selector<Element, decltype(size<2>(TileShapePV{}))>());
+  
+  using SmemLayoutQ = decltype(tile_to_shape(SmemLayoutAtomQ{}, select<0, 2>(TileShapeQK{})));
+  using SmemLayoutK = decltype(tile_to_shape(SmemLayoutAtomK{}, 
+                   make_shape(shape<1>(TileShapeQK{}), shape<2>(TileShapeQK{}), Int<Stages::value>{})));
+  using SmemLayoutV = decltype(tile_to_shape(SmemLayoutAtomV{}, 
+                   make_shape(shape<1>(TileShapePV{}), shape<2>(TileShapePV{}), Int<Stages::value>{})));
 
   using MainloopPipeline = cutlass::PipelineTmaAsync<Stages::value>;
   using MainloopPipelineQ = cutlass::PipelineTmaAsync<StagesQ::value>;
@@ -125,12 +201,21 @@ struct FmhaMainloopTma {
   using TiledMmaOut = TiledMmaPV;
   using ElementOut = ElementAccumulator;
 
+  // Scale factor shared memory layouts
+  using SmemLayoutSFQ = decltype(BlkScaledConfig::deduce_smem_layoutSFQ(TiledMmaQK{}, TileShapeQK{}));
+  using SmemLayoutSFK = decltype(BlkScaledConfig::deduce_smem_layoutSFKV(TiledMmaQK{}, TileShapeQK{}));
+  using SmemLayoutSFV = decltype(BlkScaledConfig::deduce_smem_layoutSFKV(TiledMmaPV{}, TileShapePV{}));
+
   struct SharedStorage {
     cute::array_aligned<Element, cute::cosize_v<SmemLayoutQ>> smem_q;
     union {
       cute::array_aligned<Element, cute::cosize_v<SmemLayoutK>> smem_k;
       cute::array_aligned<Element, cute::cosize_v<SmemLayoutV>> smem_v;
     };
+    // Scale factor storage
+    cute::array_aligned<ElementScaleFactor, cute::cosize_v<SmemLayoutSFQ>> smem_SFQ;
+    cute::array_aligned<ElementScaleFactor, cute::cosize_v<SmemLayoutSFK>> smem_SFK;
+    cute::array_aligned<ElementScaleFactor, cute::cosize_v<SmemLayoutSFV>> smem_SFV;
   };
 
   struct Arguments {
@@ -150,14 +235,68 @@ struct FmhaMainloopTma {
     LayoutSFV dSFV;
   };
 
-  using TMA_Q = typename CollectiveMmaQK::Params::TMA_A;
-  using TMA_K = typename CollectiveMmaQK::Params::TMA_B;
-  using TMA_V = typename CollectiveMmaPV::Params::TMA_B;
+  // TMA configuration (based on Sage3 approach)
+  using GmemTiledCopy = SM90_TMA_LOAD;
+  using GmemTiledCopySF = SM90_TMA_LOAD;
+  
+  // Define global memory layouts (simplified like Sage3)
+  using StrideQKV = cute::Stride<int64_t, _1, int64_t, int64_t>;
+  
+  using TMA_Q = decltype(make_tma_copy(
+      GmemTiledCopy{},
+      make_tensor(make_gmem_ptr(static_cast<Element const*>(nullptr)), 
+                  repeat_like(StrideQKV{}, int32_t(0)), StrideQKV{}),
+      SmemLayoutQ{},
+      select<0, 2>(TileShapeQK{}),
+      _1{}));
+  
+  using TMA_K = decltype(make_tma_copy(
+      GmemTiledCopy{},
+      make_tensor(make_gmem_ptr(static_cast<Element const*>(nullptr)), 
+                  repeat_like(StrideQKV{}, int32_t(0)), StrideQKV{}),
+      take<0, 2>(SmemLayoutK{}),
+      select<1, 2>(TileShapeQK{}),
+      _1{}));
+  
+  using TMA_V = decltype(make_tma_copy(
+      GmemTiledCopy{},
+      make_tensor(make_gmem_ptr(static_cast<Element const*>(nullptr)), 
+                  repeat_like(StrideQKV{}, int32_t(0)), StrideQKV{}),
+      take<0, 2>(SmemLayoutV{}),
+      select<1, 2>(TileShapePV{}),
+      _1{}));
+  
+  // Scale factor TMA (simplified like Sage3)
+  using TMA_SFQ = decltype(make_tma_copy<uint16_t>(
+      GmemTiledCopySF{},
+      make_tensor(static_cast<ElementScaleFactor const*>(nullptr), LayoutSF{}),
+      SmemLayoutSFQ{},
+      make_shape(shape<0>(TileShapeQK{}), shape<2>(TileShapeQK{})),
+      _1{}));
+  
+  using TMA_SFK = decltype(make_tma_copy<uint16_t>(
+      GmemTiledCopySF{},
+      make_tensor(static_cast<ElementScaleFactor const*>(nullptr), LayoutSF{}),
+      SmemLayoutSFK{}(_,_,cute::Int<0>{}),
+      make_shape(shape<1>(TileShapeQK{}), shape<2>(TileShapeQK{})),
+      _1{}));
+  
+  using TMA_SFV = decltype(make_tma_copy<uint16_t>(
+      GmemTiledCopySF{},
+      make_tensor(static_cast<ElementScaleFactor const*>(nullptr), LayoutSF{}),
+      SmemLayoutSFV{}(_,_,cute::Int<0>{}),
+      make_shape(shape<1>(TileShapePV{}), shape<2>(TileShapePV{})),
+      _1{}));
 
   struct Params {
     TMA_Q tma_load_q;
     TMA_K tma_load_k;
     TMA_V tma_load_v;
+    
+    // Scale factor TMA
+    TMA_SFQ tma_load_sfq;
+    TMA_SFK tma_load_sfk;
+    TMA_SFV tma_load_sfv;
 
     float scale_softmax;
     float scale_softmax_log2;
@@ -188,9 +327,9 @@ struct FmhaMainloopTma {
     TMA_V
   >;
 
-  static_assert(size(typename CollectiveMmaQK::TiledMma{}) == size(typename CollectiveMmaPV::TiledMma{}));
+  static_assert(size(TiledMmaQK{}) == size(TiledMmaPV{}));
 
-  static const int MaxThreadsPerBlock = size(typename CollectiveMmaQK::TiledMma{});
+  static const int MaxThreadsPerBlock = size(TiledMmaQK{});
 
   template<class ProblemShape>
   static bool can_implement(ProblemShape const& problem_size, Arguments const& args) {
@@ -204,31 +343,24 @@ struct FmhaMainloopTma {
   template<class ProblemShape>
   static Params to_underlying_arguments(ProblemShape const& problem_size, Arguments const& args, void* workspace) {
 
-    auto problem_shape_qk = make_shape(get<2>(problem_size), get<3>(problem_size), get<4>(problem_size), make_shape(get<0>(problem_size), get<1>(problem_size)));
-    auto params_qk = CollectiveMmaQK::to_underlying_arguments(problem_shape_qk,
-        typename CollectiveMmaQK::Arguments {
-            args.ptr_Q, args.dQ,
-            args.ptr_K, args.dK,
-            args.ptr_SFQ, args.dSFQ,
-            args.ptr_SFK, args.dSFK,
-        }, /*workspace=*/ nullptr);
-
-    auto problem_shape_pv = select<0,2,1,3>(problem_shape_qk);
-    auto params_pv = CollectiveMmaPV::to_underlying_arguments(problem_shape_pv,
-        typename CollectiveMmaPV::Arguments {
-            args.ptr_K, args.dK,  // never used, dummy
-            args.ptr_V, select<1,0,2>(args.dV),
-            args.ptr_SFK, args.dSFK,  // never used, dummy
-            args.ptr_SFV, args.dSFV,
-        }, /*workspace=*/ nullptr);
+    // Create TMA parameters directly
+    auto tma_load_q = TMA_Q{};
+    auto tma_load_k = TMA_K{};
+    auto tma_load_v = TMA_V{};
+    auto tma_load_sfq = TMA_SFQ{};
+    auto tma_load_sfk = TMA_SFK{};
+    auto tma_load_sfv = TMA_SFV{};
 
     return Params{
-        params_qk.tma_load_a,
-        params_qk.tma_load_b,
-        params_pv.tma_load_b,
+        tma_load_q,
+        tma_load_k,
+        tma_load_v,
         1.0f / (float) std::sqrt(get<4>(problem_size)),
         (float) (std::log2(std::exp(1.0)) / std::sqrt(get<4>(problem_size))),
-        1.0f
+        1.0f,
+        tma_load_sfq,
+        tma_load_sfk,
+        tma_load_sfv,
     };
   }
 
@@ -284,12 +416,8 @@ struct FmhaMainloopTma {
     uint16_t mcast_mask_b = 0;
 
     if (warp_idx == 0 && lane_predicate == 1) {
-      if constexpr (cute::is_same_v<typename CollectiveMmaQK::GmemTiledCopyB, SM90_TMA_LOAD_MULTICAST>) {
-        auto block_layout = Layout<ClusterShape>{}; // (m,n) -> block_id
-        for (int m = 0; m < size<0>(block_layout); ++m) {
-          mcast_mask_b |= (uint16_t(1) << block_layout(m,_0{},Int<0>{}));
-        }
-      }
+      // For NVFP4 block-scaled GEMM, we use standard TMA load
+      // No multicast mask needed for this implementation
 
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < StageCount; i++) {
