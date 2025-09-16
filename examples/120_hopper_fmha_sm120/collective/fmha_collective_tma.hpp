@@ -68,7 +68,8 @@ struct FmhaMainloopTma {
   using ClusterShape = Shape<kClusterM, _1, _1>;
 
   // 16B alignment lets us use TMA
-  static constexpr int Alignment = 16 / sizeof(Element);
+  // For NVFP4, we need 32 elements alignment (32 * 4 bytes = 128 bytes)
+  static constexpr int Alignment = 32;
 
   using TileShapeQK = TileShape;
   using TileShapePV = decltype(select<0,2,1>(TileShapeQK{}));
@@ -87,7 +88,8 @@ struct FmhaMainloopTma {
       ElementNVFP4, LayoutQ, Alignment,
       ElementNVFP4, LayoutK, Alignment,
       ElementAccumulator,
-      TileShapeQK, ClusterShape, Stages,
+      TileShapeQK, ClusterShape,
+      cutlass::gemm::collective::StageCountAutoCarveout<static_cast<int>(sizeof(SharedStorage))>,
       cutlass::gemm::collective::KernelScheduleAuto>::CollectiveOp;
 
   using CollectiveMmaPV = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -96,7 +98,8 @@ struct FmhaMainloopTma {
       ElementNVFP4, LayoutK, Alignment,
       ElementNVFP4, decltype(select<1,0,2>(LayoutV{})), Alignment,
       ElementAccumulator,
-      TileShapePV, ClusterShape, Stages,
+      TileShapePV, ClusterShape,
+      cutlass::gemm::collective::StageCountAutoCarveout<static_cast<int>(sizeof(SharedStorage))>,
       cutlass::gemm::collective::KernelScheduleAuto>::CollectiveOp;
 
   using TiledMmaQK = typename CollectiveMmaQK::TiledMma;

@@ -388,12 +388,15 @@ struct FwdRunner {
     block_ref_LSE.reset(size(shape_LSE));
 
     // Initialize scale factors for NVFP4 GEMM operations
-    // Note: Scale factor layouts are computed by the collective, we need to get them
-    // For now, we'll allocate a reasonable size and let the collective handle the layout
-    auto shape_scale = cute::make_shape(B, H, Q, D); // Same shape as Q for SFQ
-    block_SFQ.reset(size(shape_scale));
-    block_SFK.reset(size(shape_scale)); // Same shape as K for SFK
-    block_SFV.reset(size(shape_scale)); // Same shape as V for SFV
+    // Use proper scale factor layouts computed by the collective
+    using Sm1xxBlkScaledConfig = typename Operation::GemmKernel::CollectiveMainloop::Sm1xxBlkScaledConfig;
+    auto layout_SFQ = Sm1xxBlkScaledConfig::tile_atom_to_shape_SFA(cute::make_shape(Q, K, D, 1));
+    auto layout_SFK = Sm1xxBlkScaledConfig::tile_atom_to_shape_SFB(cute::make_shape(Q, K, D, 1));
+    auto layout_SFV = Sm1xxBlkScaledConfig::tile_atom_to_shape_SFB(cute::make_shape(Q, K, D, 1));
+    
+    block_SFQ.reset(size(filter_zeros(layout_SFQ)));
+    block_SFK.reset(size(filter_zeros(layout_SFK)));
+    block_SFV.reset(size(filter_zeros(layout_SFV)));
 
     initialize_block(block_Q, seed + 2023, false);
     initialize_block(block_K, seed + 2022, false);
@@ -770,9 +773,6 @@ struct BwdRunner {
       block_Q.get(), stride_Q,
       block_K.get(), stride_K,
       block_V.get(), stride_V,
-      block_SFQ.get(), stride_Q,  // Scale factors use same layout as their corresponding data
-      block_SFK.get(), stride_K,
-      block_SFV.get(), stride_V,
       block_O.get(), stride_O,
       block_LSE.get(), stride_LSE,
       block_dO.get(), stride_dO,

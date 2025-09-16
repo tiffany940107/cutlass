@@ -1,0 +1,54 @@
+Building CUDA object examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/88_hopper_fmha.cu.o
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(746): error: identifier "block_SFQ" is undefined
+      block_SFQ.reset(size(filter_zeros(layout_SFQ)));
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(747): error: identifier "block_SFK" is undefined
+      block_SFK.reset(size(filter_zeros(layout_SFK)));
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(748): error: identifier "block_SFV" is undefined
+      block_SFV.reset(size(filter_zeros(layout_SFV)));
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(756): error: no instance of function template "initialize_block" matches the argument list
+            argument types are: (<error-type>, unsigned long, bool)
+      initialize_block(block_SFQ, seed + 2024, false);
+      ^
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(198): note #3327-D: candidate function template "initialize_block" failed deduction
+  bool initialize_block(
+       ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(757): error: no instance of function template "initialize_block" matches the argument list
+            argument types are: (<error-type>, unsigned long, bool)
+      initialize_block(block_SFK, seed + 2025, false);
+      ^
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(198): note #3327-D: candidate function template "initialize_block" failed deduction
+  bool initialize_block(
+       ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(758): error: no instance of function template "initialize_block" matches the argument list
+            argument types are: (<error-type>, unsigned long, bool)
+      initialize_block(block_SFV, seed + 2026, false);
+      ^
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(198): note #3327-D: candidate function template "initialize_block" failed deduction
+  bool initialize_block(
+       ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(792): error: identifier "block_SFQ" is undefined
+        block_SFQ.get(), stride_Q,
+        ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(793): error: identifier "block_SFK" is undefined
+        block_SFK.get(), stride_K,
+        ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu(794): error: identifier "block_SFV" is undefined
+        block_SFV.get(), stride_V,
+        ^
+
+9 errors detected in the compilation of "/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu".
+make[3]: *** [examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/build.make:80: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/88_hopper_fmha.cu.o] Error 2
+make[2]: *** [CMakeFiles/Makefile2:51605: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/all] Error 2
+make[1]: *** [CMakeFiles/Makefile2:51612: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/rule] Error 2
+make: *** [Makefile:17178: 120_hopper_fmha_sm120] Error 2
