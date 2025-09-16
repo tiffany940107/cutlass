@@ -92,14 +92,16 @@ template<typename Threshold, typename Source, typename Reference>
 inline auto __device__ constexpr layout_separate(Threshold const& thr,
         Source const& src, Reference const& ref) {
     auto lt = filter(transform_layout(src, ref, [&](auto const& s, auto const& r) {
-        if constexpr(decltype(r < thr)::value) {
+        // Handle tuple case by comparing first element
+        if constexpr(decltype(get<0>(r) < thr)::value) {
             return s;
         } else {
             return make_layout(_1{}, _0{});
         }
     }));
     auto ge = filter(transform_layout(src, ref, [&](auto const& s, auto const& r) {
-        if constexpr(decltype(r >= thr)::value) {
+        // Handle tuple case by comparing first element
+        if constexpr(decltype(get<0>(r) >= thr)::value) {
             return s;
         } else {
             return make_layout(_1{}, _0{});

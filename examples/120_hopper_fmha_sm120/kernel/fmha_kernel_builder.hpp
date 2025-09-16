@@ -106,7 +106,7 @@ struct FmhaBuilder<
   Options...
 > {
 
-  using CollectiveMainloop = cutlass::fmha::collective::FmhaMainloopTmaWarpSpecialized<
+  using CollectiveMainloop = cutlass::fmha::collective::FmhaMainloopTma<
       Element, ElementAccumulatorQK, ElementAccumulatorPV,
       TileShape, LayoutQ, LayoutK, LayoutV,
       Fusion, Options...>;

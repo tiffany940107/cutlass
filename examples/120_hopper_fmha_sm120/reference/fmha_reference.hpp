@@ -55,7 +55,7 @@ void __global__ fmha_reference_kernel(
   using ElementAccumulator = typename TensorLSE::value_type;
   
   extern __shared__ char mS_mem[];
-  Element* mS = reinterpret_cast<Element*>(mS_mem);
+  ElementAccumulator* mS = reinterpret_cast<ElementAccumulator*>(mS_mem);
 
   ElementAccumulator softmax_scale = static_cast<ElementAccumulator>(1.0 / sqrt(1.0 * size<1>(mO)));
 
@@ -70,7 +70,7 @@ void __global__ fmha_reference_kernel(
         auto frag = make_tensor<ElementAccumulator>(Shape<_1, _1>{});
         frag(0) = acc;
         fusion.before_softmax(frag, make_tensor(id.data() + make_arithmetic_tuple(idx_Q, idx_K), id.layout()), problem_shape);
-        mS[idx_K] = static_cast<Element>(frag(0) * softmax_scale);
+        mS[idx_K] = frag(0) * softmax_scale;
       }
 
       __syncthreads();
@@ -84,7 +84,7 @@ void __global__ fmha_reference_kernel(
       __syncthreads();
 
       for (int idx_K = threadIdx.x; idx_K < size<0>(mK); idx_K += blockDim.x) {
-        mS[idx_K] = static_cast<Element>(exp(mS[idx_K] - maxS));
+        mS[idx_K] = exp(mS[idx_K] - maxS);
       }
 
       __syncthreads();
@@ -99,7 +99,7 @@ void __global__ fmha_reference_kernel(
       for (int idx_D = threadIdx.x; idx_D < size<1>(mO); idx_D += blockDim.x) {
         ElementAccumulator acc = 0;
         for (int idx_K = 0; idx_K < size<0>(mK); idx_K++) {
-          acc += mS[idx_K] * mV(idx_K, idx_D, idx_L) * scale;
+          acc += mS[idx_K] * static_cast<ElementAccumulator>(mV(idx_K, idx_D, idx_L)) * static_cast<ElementAccumulator>(scale);
         }
         mO(idx_Q, idx_D, idx_L) = static_cast<Element>(acc);
       }

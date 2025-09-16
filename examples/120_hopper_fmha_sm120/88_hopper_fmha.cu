@@ -244,9 +244,7 @@ struct FwdRunner {
 
   using ElementAccumulatorPV = float;
 
-  // NVFP4 types for internal GEMM operations
-  using ElementNVFP4 = cutlass::nv_float4_t<cutlass::float_e2m1_t>;
-  using ElementScaleFactor = typename ElementNVFP4::ScaleFactorType;
+  // Scale factors are now scalar parameters, no special types needed
 
   // B H Q K D
   using ProblemShapeType = cute::tuple<int, int, int, int, int>;
@@ -287,10 +285,7 @@ struct FwdRunner {
   cutlass::DeviceAllocation<Element> block_ref_O;
   cutlass::DeviceAllocation<ElementAccumulatorPV> block_ref_LSE;
   
-  // Scale factor allocations for NVFP4 GEMM operations
-  cutlass::DeviceAllocation<ElementScaleFactor> block_SFQ;
-  cutlass::DeviceAllocation<ElementScaleFactor> block_SFK;
-  cutlass::DeviceAllocation<ElementScaleFactor> block_SFV;
+  // Scale factors are now handled as scalar parameters
 
   //
   // Methods
@@ -387,25 +382,14 @@ struct FwdRunner {
     block_ref_O.reset(size(shape_QO));
     block_ref_LSE.reset(size(shape_LSE));
 
-    // Initialize scale factors for NVFP4 GEMM operations
-    // Use proper scale factor layouts computed by the collective
-    using Sm1xxBlkScaledConfig = typename Operation::GemmKernel::CollectiveMainloop::Sm1xxBlkScaledConfig;
-    auto layout_SFQ = Sm1xxBlkScaledConfig::tile_atom_to_shape_SFA(cute::make_shape(Q, K, D, 1));
-    auto layout_SFK = Sm1xxBlkScaledConfig::tile_atom_to_shape_SFB(cute::make_shape(Q, K, D, 1));
-    auto layout_SFV = Sm1xxBlkScaledConfig::tile_atom_to_shape_SFB(cute::make_shape(Q, K, D, 1));
-    
-    block_SFQ.reset(size(filter_zeros(layout_SFQ)));
-    block_SFK.reset(size(filter_zeros(layout_SFK)));
-    block_SFV.reset(size(filter_zeros(layout_SFV)));
+    // Scale factors are now handled as scalar parameters in the collective
+    // No need to initialize block scale factors
 
     initialize_block(block_Q, seed + 2023, false);
     initialize_block(block_K, seed + 2022, false);
     initialize_block(block_V, seed + 2021, false);
     
-    // Initialize scale factors with random values
-    initialize_block(block_SFQ, seed + 2024, false);
-    initialize_block(block_SFK, seed + 2025, false);
-    initialize_block(block_SFV, seed + 2026, false);
+    // Scale factors are now scalar parameters, no initialization needed
   }
 
   ExampleResult run(const Options& options, const cutlass::KernelHardwareInfo& hw_info) {
@@ -418,11 +402,12 @@ struct FwdRunner {
       { block_Q.get(), stride_Q,
         block_K.get(), stride_K,
         block_V.get(), stride_V,
-        block_SFQ.get(), stride_Q,  // Scale factors use same layout as their corresponding data
-        block_SFK.get(), stride_K,
-        block_SFV.get(), stride_V },
+        1.0f,  // scale_q
+        1.0f,  // scale_k
+        1.0f   // scale_v
+      },
       { block_O.get(), stride_O,
-      block_LSE.get(), stride_LSE },
+        block_LSE.get(), stride_LSE },
       hw_info
     };
 
@@ -560,6 +545,9 @@ struct FwdRunner {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Temporarily disable backward pass compilation for NVFP4 development
+#ifndef DISABLE_BWD_COMPILATION
+
 template<
   class TileShape,
   class DispatchPolicy,
@@ -568,7 +556,7 @@ template<
 >
 struct BwdRunner {
 
-  using Element = cutlass::float_e2m1_t;  // Use E2M1 like Sage3 for NVFP4 compatibility
+  using Element = cutlass::half_t;  // Use half_t for backward pass (not supported with NVFP4)
   using ElementAccumulator = float;
 
   // B H Q K D
@@ -918,6 +906,8 @@ struct BwdRunner {
 
 };
 
+#endif // DISABLE_BWD_COMPILATION
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Helper to print a description of the example run and its result
@@ -952,7 +942,7 @@ void run_fwd_32(Fusion fusion, Options const & options, cutlass::KernelHardwareI
 
   using HeadDim = _32;
 
-  run(Shape< _64, _128, HeadDim>{}, KernelTma{}, "tma 64x128x32");
+  run(Shape< _64, _128, HeadDim>{}, KernelCooperative{}, "tma ws cooperative 64x128x32");
   run(Shape< _128, _64, HeadDim>{}, KernelCooperative{}, "tma ws cooperative 128x64x32");
 }
 
@@ -968,7 +958,7 @@ void run_fwd_64(Fusion fusion, Options const & options, cutlass::KernelHardwareI
 
   using HeadDim = _64;
 
-  run(Shape< _64, _128, HeadDim>{}, KernelTma{}, "tma 64x128x64");
+  run(Shape< _64, _128, HeadDim>{}, KernelCooperative{}, "tma ws cooperative 64x128x64");
   run(Shape< _128, _64, HeadDim>{}, KernelCooperative{}, "tma ws cooperative 128x64x64");
   run(Shape< _128, _64, HeadDim>{}, KernelPingpong{}, "tma ws ping-pong 128x64x64");
 }
@@ -1015,6 +1005,8 @@ void run_fwd_256(Fusion fusion, Options const & options, cutlass::KernelHardware
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef DISABLE_BWD_COMPILATION
+
 template<class Fusion>
 void run_bwd_32(Fusion fusion, Options const & options, cutlass::KernelHardwareInfo const& hw_info) {
   auto run = [&](auto shape, auto kernel, const char* name, auto... kernel_options) {
@@ -1059,6 +1051,8 @@ void run_bwd_128(Fusion fusion, Options const & options, cutlass::KernelHardware
 
   run(Shape<_64, _128, HeadDim>{}, KernelCooperative{}, "tma ws cooperative 64x128x128");
 }
+
+#endif // DISABLE_BWD_COMPILATION
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1141,6 +1135,7 @@ int main_single(int argc, char const **args) {
 
   with_fusion([&](auto fusion) {
     if (options.bwd) {
+#ifndef DISABLE_BWD_COMPILATION
 #ifndef FP8
       if (options.d <= 32) {
         run_bwd_32(fusion, options, hw_info);
@@ -1157,6 +1152,9 @@ int main_single(int argc, char const **args) {
         std::cout << "No backward kernel instantiated for d=" << options.d << std::endl;
 #endif
       }
+#else
+      std::cerr << "Backward pass compilation is disabled for NVFP4 development" << std::endl;
+#endif
     } else {
 #ifndef FP8
       if (options.d <= 32) {

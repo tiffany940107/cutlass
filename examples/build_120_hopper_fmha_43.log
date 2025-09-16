@@ -1,0 +1,30 @@
+Building CUDA object examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/88_hopper_fmha.cu.o
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(180): error: identifier "TMA_Q" is undefined
+      TMA_Q tma_load_q;
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(181): error: identifier "TMA_K" is undefined
+      TMA_K tma_load_k;
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(182): error: identifier "TMA_V" is undefined
+      TMA_V tma_load_v;
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(198): error: identifier "TMA_Q" is undefined
+      TMA_Q
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(206): error: identifier "TMA_K" is undefined
+      TMA_K
+      ^
+
+/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/kernel/../collective/fmha_collective_tma.hpp(214): error: identifier "TMA_V" is undefined
+      TMA_V
+      ^
+
+6 errors detected in the compilation of "/home/yanwa/workspace/cutlass/examples/120_hopper_fmha_sm120/88_hopper_fmha.cu".
+make[3]: *** [examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/build.make:80: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/88_hopper_fmha.cu.o] Error 2
+make[2]: *** [CMakeFiles/Makefile2:51605: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/all] Error 2
+make[1]: *** [CMakeFiles/Makefile2:51612: examples/120_hopper_fmha_sm120/CMakeFiles/120_hopper_fmha_sm120.dir/rule] Error 2
+make: *** [Makefile:17178: 120_hopper_fmha_sm120] Error 2
