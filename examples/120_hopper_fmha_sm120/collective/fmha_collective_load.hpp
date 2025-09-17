@@ -125,11 +125,10 @@ struct CollectiveLoadTma {
       using BarrierType = typename Pipeline::ProducerBarrierType;
       BarrierType* tma_barrier = pipeline.producer_get_barrier(smem_pipe_write);
 
-      if constexpr (kKind == LoadKind::kBwdScalar) {
-        copy(params.with(*tma_barrier, mcast_mask), get<0>(state)(_,_,*tile_iter), get<1>(state)(_,_,smem_pipe_write.index()));
-      } else {
-        copy(params.with(*tma_barrier, mcast_mask), get<0>(state)(_,_,_,*tile_iter), get<1>(state)(_,_,_,smem_pipe_write.index()));
-      }
+      // 根据2号日志错误信息，现在又需要3维坐标访问3维tensor
+      // 错误显示：Coord=cute::tuple<cute::Underscore, cute::Underscore, cute::Underscore, int> (4维)
+      // Layout=cute::tuple<cute::tuple<cute::C<64>, cute::C<64>>, cute::_1>, cute::_1, cute::_1 (3维)
+      copy(params.with(*tma_barrier, mcast_mask), get<0>(state)(_,_,*tile_iter), get<1>(state)(_,_,smem_pipe_write.index()));
       if constexpr (kAdvancePipe) ++smem_pipe_write;
       if constexpr (kAdvanceIterator) ++tile_iter;
     }

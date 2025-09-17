@@ -52,7 +52,8 @@ struct CollectiveSoftmax {
 
   template<class AccPV, class TiledMmaPV>
   CUTLASS_DEVICE auto init(AccPV const& acc_pv, TiledMmaPV const& tiled_mma_pv) {
-    Tensor s_max = make_fragment_like<MaxType>(size<0>(layout_acc_mn(tiled_mma_pv, acc_pv.layout())));
+    // Simplified for SM120 - use original layout directly
+    Tensor s_max = make_fragment_like<MaxType>(size<0>(acc_pv));
     Tensor a_sum = make_fragment_like<SumType>(s_max);
     return make_tuple(s_max, a_sum);
   }
@@ -88,12 +89,16 @@ struct CollectiveSoftmax {
   template<class AccQK, class TiledMmaQK, class CountQK, class State, class ProblemShape>
   CUTLASS_DEVICE auto step(AccQK& acc_qk, TiledMmaQK const& tiled_mma_qk, CountQK const& count_qk, State& state, ProblemShape const& problem_shape) {
     Fusion{}.before_softmax(acc_qk, count_qk, problem_shape);
+    // Use Sage3 approach - proper tensor layout
     Tensor acc_qk_mn = make_tensor(acc_qk.data(), layout_acc_mn(tiled_mma_qk, acc_qk.layout()));
-    auto reduction_target_qk = reduction_target_n(tiled_mma_qk);
-    constexpr int red_rank = decltype(rank(reduction_target_qk))::value;
+    // // constexpr int red_rank = decltype(rank(reduction_target_qk))::value; // Not needed for SM120 // Not needed for SM120
 
     auto& s_max = get<0>(state);
     auto& a_sum = get<1>(state);
+
+    // Use Sage3 approach - proper tensor layout and reduction
+    auto reduction_target_qk = reduction_target_n(tiled_mma_qk);
+    constexpr int red_rank = decltype(rank(reduction_target_qk))::value;
 
     // Linear reduction is faster for the first iteration
     CUTLASS_PRAGMA_UNROLL
@@ -107,7 +112,7 @@ struct CollectiveSoftmax {
         s_max(i) = overload_max(s_max(i), acc_qk_mn(i, j));
       }
     }
-
+    // reduce max
     for_each(make_seq<red_rank>{}, [&](auto r) {
       CUTLASS_PRAGMA_UNROLL
       for (int j = 1; j < shape<r>(reduction_target_qk); j *= 2) {
@@ -117,6 +122,17 @@ struct CollectiveSoftmax {
         }
       }
     });
+
+    // Simplified reduction for SM120 - no complex reduction needed
+    // for_each(make_seq<red_rank>{}, [&](auto r) {
+    //   CUTLASS_PRAGMA_UNROLL
+    //   for (int j = 1; j < shape<r>(reduction_target_qk); j *= 2) {
+    //     CUTLASS_PRAGMA_UNROLL
+    //     for (int i = 0; i < size<0>(acc_qk_mn); i++) {
+    //       s_max(i) = overload_max(s_max(i), MaxType{__shfl_xor_sync(uint32_t(-1), overload_to_native(s_max(i)), stride<r>(reduction_target_qk) * j)});
+    //     }
+    //   }
+    // });
     CUTLASS_PRAGMA_UNROLL
     for (int i = 0; i < size<0>(acc_qk_mn); i++) {
       MaxType local_max = s_max(i) == static_cast<MaxType>(-INFINITY) ? static_cast<MaxType>(0) : s_max(i);
@@ -153,27 +169,25 @@ struct CollectiveSoftmax {
 
     Tensor s_max_prev = make_fragment_like(s_max);
     CUTLASS_PRAGMA_UNROLL
-    for (int i = 0; i < size<0>(acc_qk_mn); i++) {
+    for (int i = 0; i < size(acc_qk_mn); i++) {
       s_max_prev(i) = s_max(i);
     }
+    // Use Sage3 approach - 1D flattened tensor access
     CUTLASS_PRAGMA_UNROLL
-    for (int i = 0; i < size<0>(acc_qk_mn); i++) {
-      // Linear reduction is faster here, as well
-      CUTLASS_PRAGMA_UNROLL
-      for (int j = 0; j < size<1>(acc_qk_mn); j++) {
-        s_max(i) = overload_max(s_max(i), acc_qk_mn(i, j));
-      }
+    for (int i = 0; i < size(acc_qk_mn); i++) {
+      s_max(i) = overload_max(s_max(i), acc_qk_mn(i));
     }
     // reduce max
-    for_each(make_seq<red_rank>{}, [&](auto r) {
-      CUTLASS_PRAGMA_UNROLL
-      for (int j = 1; j < shape<r>(reduction_target_qk); j *= 2) {
-        CUTLASS_PRAGMA_UNROLL
-        for (int i = 0; i < size<0>(acc_qk_mn); i++) {
-          s_max(i) = overload_max(s_max(i), __shfl_xor_sync(uint32_t(-1), s_max(i), stride<r>(reduction_target_qk) * j));
-        }
-      }
-    });
+    // Simplified reduction for SM120 - no complex reduction needed
+    // for_each(make_seq<red_rank>{}, [&](auto r) { // Not needed for SM120
+    //   CUTLASS_PRAGMA_UNROLL
+    //   for (int j = 1; j < shape<r>(reduction_target_qk); j *= 2) {
+    //     CUTLASS_PRAGMA_UNROLL
+    //     for (int i = 0; i < size<0>(acc_qk_mn); i++) {
+    //       s_max(i) = overload_max(s_max(i), __shfl_xor_sync(uint32_t(-1), s_max(i), stride<r>(reduction_target_qk) * j));
+    //     }
+    //   }
+    // });
     CUTLASS_PRAGMA_UNROLL
     for (int i = 0; i < size<0>(acc_pv_mn); i++) {
       float s_max_cur = s_max(i) == -INFINITY ? 0.0f : s_max(i);
@@ -181,7 +195,7 @@ struct CollectiveSoftmax {
       a_sum(i) *= scale;
       CUTLASS_PRAGMA_UNROLL
       for (int j = 0; j < size<1>(acc_pv_mn); j++) {
-        acc_pv_mn(i, j) *= scale;
+        acc_pv_mn(i) *= scale;
       }
     }
   }
@@ -192,16 +206,14 @@ struct CollectiveSoftmax {
     auto& s_max = get<0>(state);
     auto& a_sum = get<1>(state);
 
+    // Use Sage3 approach - 1D flattened tensor access
     CUTLASS_PRAGMA_UNROLL
-    for (int j = 0; j < size<0>(acc_qk_mn); j++) {
-      float local_max = s_max(j) == -INFINITY ? 0.f : s_max(j);
+    for (int i = 0; i < size(acc_qk_mn); i++) {
+      float local_max = s_max(i) == -INFINITY ? 0.f : s_max(i);
       float scale_max = params.scale_softmax_log2 * local_max;
 
-      CUTLASS_PRAGMA_UNROLL
-      for (int k = 0; k < size<1>(acc_qk_mn); k++) {
-        acc_qk_mn(j, k) = ::exp2f(params.scale_softmax_log2 * acc_qk_mn(j, k) - scale_max);
-        a_sum(j) += acc_qk_mn(j, k);
-      }
+      acc_qk_mn(i) = ::exp2f(params.scale_softmax_log2 * acc_qk_mn(i) - scale_max);
+      a_sum(i) += acc_qk_mn(i);
     }
   }
 

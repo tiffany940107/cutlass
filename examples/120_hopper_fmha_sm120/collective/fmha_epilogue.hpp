@@ -115,6 +115,7 @@ struct FmhaFwdEpilogue {
     Tensor cO = make_identity_tensor(take<0,2>(tile_shape));
     Tensor tOcO = thr_mma.partition_C(cO);
     if (get<1>(tOcO(_0{})) == 0) {
+      // Use layout_acc_mn like Sage3 for proper tensor layout
       auto tOgLSE_mn = make_tensor(tOgLSE.data(), layout_acc_mn(tiled_mma, tOgLSE.layout()));
       auto tOcO_mn = make_tensor(tOcO.data(), layout_acc_mn(tiled_mma, tOcO.layout()));
       CUTLASS_PRAGMA_UNROLL

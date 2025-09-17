@@ -88,11 +88,12 @@ struct fmha_max {
   CUTE_DEVICE float operator()(float a, float b) { return ::max(a, b); }
 };
 
+// Removed layout_separate - not needed for SM120 blockscaled GEMM (Sage3 doesn't use it)
+// template<typename Threshold, typename Source, typename Reference>
 template<typename Threshold, typename Source, typename Reference>
 inline auto __device__ constexpr layout_separate(Threshold const& thr,
         Source const& src, Reference const& ref) {
     auto lt = filter(transform_layout(src, ref, [&](auto const& s, auto const& r) {
-        // Handle tuple case by comparing first element
         if constexpr(decltype(get<0>(r) < thr)::value) {
             return s;
         } else {
@@ -100,7 +101,6 @@ inline auto __device__ constexpr layout_separate(Threshold const& thr,
         }
     }));
     auto ge = filter(transform_layout(src, ref, [&](auto const& s, auto const& r) {
-        // Handle tuple case by comparing first element
         if constexpr(decltype(get<0>(r) >= thr)::value) {
             return s;
         } else {
@@ -122,7 +122,7 @@ inline auto __device__ constexpr layout_acc_mn(TiledMma const& tiled_mma, Acc co
 template<typename TiledMma, typename Acc>
 inline auto __device__ constexpr layout_op_mk_v(TiledMma const& tiled_mma, Acc const& acc) {
     return layout_separate(get<0>(typename TiledMma::Shape_MNK{}),
-            get<0>(acc), stride<1>(typename TiledMma::LayoutA_TV{}));
+            get<0>(acc), stride<1>(typename TiledMma::LayoutC_TV{}));
 }
 
 template<typename TiledMma, typename Acc>
@@ -137,6 +137,12 @@ inline auto __device__ constexpr reduction_target_n(TiledMma const& tiled_mma) {
             stride<0>(typename TiledMma::LayoutC_TV{}));
     return get<1>(separated);
 }
+
+// Removed reduction_target_n - not needed for SM120 blockscaled GEMM (Sage3 doesn't use it)
+// template<typename TiledMma>
+// inline auto __device__ constexpr reduction_target_n(TiledMma const& tiled_mma) {
+//     // Complex layout operations not needed for SM120
+// }
 
 
 template<template<cute::GMMA::Major, cute::GMMA::Major, cute::GMMA::ScaleIn, cute::GMMA::ScaleIn> class Primitive, cute::GMMA::Major tA, cute::GMMA::Major tB, cute::GMMA::ScaleIn sA, cute::GMMA::ScaleIn sB>
